@@ -6,15 +6,15 @@ e o [gsKit](https://github.com/ps2dev/gsKit).
 
 ![Tela de jogo](docs/jogo.png)
 
-| Título | Novo jogo |
-|---|---|
-| ![Título](docs/titulo.png) | ![Configuração](docs/config.png) |
+| Título | Novo jogo | Vitória |
+|---|---|---|
+| ![Título](docs/titulo.png) | ![Configuração](docs/config.png) | ![Vitória](docs/vitoria.png) |
 
 ## Como jogar
 
-- Cada jogador começa com **12 boias** da sua cor (vermelho, verde, roxo, amarelo).
+- Cada jogador começa com **12 boias** da sua cor (vermelho, amarelo, azul, verde), e cada cor tem seu hipopótamo.
   Para decidir quem começa, cada um rola um dado e o maior número começa.
-- A piscina tem **12 raias**. A **raia 7 é a Torre do Salva-Vidas**.
+- A piscina tem **12 raias**. A **raia 7 é a do salva-vidas**.
 - Na sua vez, role **3 dados**. Cada dado coloca 1 boia na raia do seu número,
   ou você pode **somar 2 ou 3 dados** para alcançar raias maiores (e coloca menos boias).
   Ex.: 6, 4 e 2 permitem: raias 2, 4 e 6 / 10 e 2 / 8 e 4 / duas na 6 / uma na 12.
@@ -23,8 +23,8 @@ e o [gsKit](https://github.com/ps2dev/gsKit).
 - **Penalidade:** se você expulsar uma boia da **sua** cor, recolhe **todas** as
   boias daquela raia, de qualquer cor. Boias de outras cores na sua reserva
   precisam ser colocadas primeiro.
-- **Bônus do 7:** somou 7 com 2 ou 3 dados? A boia vai para a Torre (sem limite e
-  nunca volta) e você **joga de novo**. No lance bônus o 7 ainda vale a Torre, mas
+- **Bônus do 7:** somou 7 com 2 ou 3 dados? A boia vai para a raia 7 (sem limite e
+  nunca volta) e você **joga de novo**. No lance bônus o 7 ainda vale, mas
   não existe terceiro lance.
 - **Vence quem esvaziar a reserva primeiro.**
 
@@ -97,10 +97,24 @@ src/ui.c/h        telas, animações e fluxo da partida
 src/render.c/h    camada de desenho (texto, formas, painéis)
 src/main_ps2.c    backend PS2: gsKit (vídeo) + libpad (controles)
 src/atlas.h       fonte e formas geradas por tools/gen_atlas.py (make atlas)
+src/assets.h/.c   tabela de sprites e o assets.bin embutido (make assets)
+assets/src/       folhas de sprites originais
 tools/sim.c       backend de PC para capturas de tela
 tests/            testes das regras (inclui 300 partidas simuladas)
 iso/SYSTEM.CNF    boot do CD
 ```
 
-A fonte do texto é gerada a partir da DejaVu Sans Bold (licença livre).
-Todos os gráficos são desenhados pelo próprio jogo.
+## Gráficos
+
+Os sprites (hipopótamos, boias, dados, botões, cenário, fonte amarela e a
+animação da água) vêm das folhas em `assets/src/`. O script
+`tools/gen_assets.py` (`make assets`, precisa de Python 3 + Pillow + numpy)
+remove o fundo branco, recorta cada sprite, reduz para 256 cores e empacota
+tudo em páginas de 512x512 (`assets/assets.bin` + `src/assets.h`). No PS2
+cada página vira uma textura PSMT8 com paleta, cabendo inteira na VRAM.
+
+Para trocar um sprite, edite a folha ou o retângulo correspondente em
+`tools/gen_assets.py` e rode `make assets`.
+
+O texto pequeno usa a fonte DejaVu Sans Bold (licença livre), gerada por
+`tools/gen_atlas.py`.

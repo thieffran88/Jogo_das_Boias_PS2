@@ -7,7 +7,7 @@
 
 EE_BIN       = jogo_das_boias_unpacked.elf
 EE_BIN_PKD   = jogo_das_boias.elf
-EE_OBJS      = src/main_ps2.o src/ui.o src/render.o src/game.o src/ai.o
+EE_OBJS      = src/main_ps2.o src/ui.o src/render.o src/game.o src/ai.o src/assets.o
 EE_INCS     += -I$(GSKIT)/include -Isrc
 EE_LDFLAGS  += -L$(GSKIT)/lib
 EE_LIBS      = -lgskit_toolkit -lgskit -ldmakit -lpad -lpatches -lm
@@ -20,7 +20,7 @@ ISO_NAME   = jogo_das_boias.iso
 ISO_BOOT   = BOIA_000.01
 
 HOST_CC   ?= cc
-HOST_SRCS  = src/ui.c src/render.c src/game.c src/ai.c
+HOST_SRCS  = src/ui.c src/render.c src/game.c src/ai.c src/assets.c
 
 all: $(EE_BIN_PKD)
 
@@ -37,7 +37,12 @@ $(EE_BIN_PKD): $(EE_BIN)
 atlas:
 	python3 tools/gen_atlas.py > src/atlas.h
 
-src/render.o src/ui.o src/main_ps2.o: src/atlas.h
+# Recorta os sprites das folhas em assets/src (Python 3 + Pillow + numpy).
+assets:
+	python3 tools/gen_assets.py
+
+src/render.o src/ui.o src/main_ps2.o: src/atlas.h src/assets.h
+src/assets.o: assets/assets.bin src/assets.h
 
 iso: $(EE_BIN_PKD)
 	rm -rf build/iso && mkdir -p build/iso
@@ -62,7 +67,7 @@ clean:
 	rm -f $(EE_OBJS) $(EE_BIN) $(EE_BIN_PKD) $(ISO_NAME) build_stripped.elf
 	rm -rf build
 
-.PHONY: all iso test sim clean atlas
+.PHONY: all iso test sim clean atlas assets
 
 ifdef PS2SDK
 include $(PS2SDK)/samples/Makefile.pref

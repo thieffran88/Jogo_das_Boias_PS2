@@ -14,10 +14,12 @@
 
 #include "render.h"
 #include "atlas.h"
+#include "assets.h"
 #include "ui.h"
 
 static GSGLOBAL *gs;
 static GSTEXTURE atlas_tex;
+static GSTEXTURE page_tex[ASSET_NUM_PAGES];
 static float sx = 1.0f, sy = 1.0f;
 
 static char pad_buf[2][256] __attribute__((aligned(64)));
@@ -83,7 +85,59 @@ void r_atlas(float x, float y, float w, float h,
                               1, gs_tint(c));
 }
 
+void r_image(int page, float x, float y, float w, float h,
+             float u0, float v0, float u1, float v1, rgba_t c)
+{
+    if (w <= 0 || h <= 0) return;
+    gsKit_prim_sprite_texture(gs, &page_tex[page],
+                              x * sx, y * sy, u0, v0,
+                              (x + w) * sx, (y + h) * sy, u1, v1,
+                              1, gs_tint(c));
+}
+
 /* ---- inicializacao ---- */
+
+/* Posicao da entrada i na CLUT de 256 cores (modo CSM1 do GS). */
+static int clut_pos(int i)
+{
+    return (i & 0xE7) | ((i & 0x08) << 1) | ((i & 0x10) >> 1);
+}
+
+/* Envia uma textura de 8 bits (PSMT8) com paleta RGBA de 256 cores. */
+static int upload_t8(GSTEXTURE *t, const unsigned char *idx, int w, int h,
+                     const unsigned char *pal_rgba, int alpha_only)
+{
+    int i;
+    u32 *clut = (u32 *)memalign(64, 256 * 4);
+    if (!clut) return -1;
+    for (i = 0; i < 256; i++) {
+        u32 r, g, b, a;
+        if (alpha_only) {
+            r = g = b = 255;
+            a = i;
+        } else {
+            r = pal_rgba[i * 4 + 0];
+            g = pal_rgba[i * 4 + 1];
+            b = pal_rgba[i * 4 + 2];
+            a = pal_rgba[i * 4 + 3];
+        }
+        clut[clut_pos(i)] = (((a + 1) >> 1) << 24) | (b << 16) | (g << 8) | r;
+    }
+    memset(t, 0, sizeof(*t));
+    t->Width = w;
+    t->Height = h;
+    t->PSM = GS_PSM_T8;
+    t->ClutPSM = GS_PSM_CT32;
+    t->Filter = GS_FILTER_LINEAR;
+    t->Mem = (u32 *)idx;
+    t->Clut = clut;
+    t->Vram = gsKit_vram_alloc(gs, gsKit_texture_size(w, h, GS_PSM_T8), GSKIT_ALLOC_USERBUFFER);
+    t->VramClut = gsKit_vram_alloc(gs, gsKit_texture_size(16, 16, GS_PSM_CT32), GSKIT_ALLOC_USERBUFFER);
+    if (t->Vram == GSKIT_ALLOC_ERROR || t->VramClut == GSKIT_ALLOC_ERROR) return -1;
+    FlushCache(0);
+    gsKit_texture_upload(gs, t);
+    return 0;
+}
 
 static void load_modules(void)
 {
@@ -136,7 +190,6 @@ static unsigned int read_pads(void)
 static void init_gfx(void)
 {
     int i;
-    u32 *px;
 
     gs = gsKit_init_global();
     gs->PSM = GS_PSM_CT24;
@@ -157,22 +210,17 @@ static void init_gfx(void)
     sx = gs->Width / (float)SCREEN_W;
     sy = gs->Height / (float)SCREEN_H;
 
-    /* atlas: branco com alfa (0..0x80) */
-    memset(&atlas_tex, 0, sizeof(atlas_tex));
-    atlas_tex.Width = ATLAS_W;
-    atlas_tex.Height = ATLAS_H_PX;
-    atlas_tex.PSM = GS_PSM_CT32;
-    atlas_tex.Filter = GS_FILTER_LINEAR;
-    atlas_tex.Mem = (u32 *)memalign(128, ATLAS_W * ATLAS_H_PX * 4);
-    px = atlas_tex.Mem;
-    for (i = 0; i < ATLAS_W * ATLAS_H_PX; i++) {
-        u32 a = (atlas_alpha[i] + 1) >> 1;
-        px[i] = (a << 24) | 0x00FFFFFF;
+    /* atlas da fonte/formas: indice = alfa */
+    {
+        unsigned char *buf = (unsigned char *)memalign(128, ATLAS_W * ATLAS_H_PX);
+        memcpy(buf, atlas_alpha, ATLAS_W * ATLAS_H_PX);
+        upload_t8(&atlas_tex, buf, ATLAS_W, ATLAS_H_PX, NULL, 1);
     }
-    FlushCache(0);
-    atlas_tex.Vram = gsKit_vram_alloc(gs,
-        gsKit_texture_size(ATLAS_W, ATLAS_H_PX, GS_PSM_CT32), GSKIT_ALLOC_USERBUFFER);
-    gsKit_texture_upload(gs, &atlas_tex);
+    /* paginas de sprites */
+    for (i = 0; i < ASSET_NUM_PAGES; i++)
+        upload_t8(&page_tex[i], assets_bin + asset_pages[i].idx_off,
+                  ASSET_PAGE_SIZE, asset_pages[i].h,
+                  assets_bin + asset_pages[i].pal_off, 0);
 }
 
 int main(int argc, char **argv)

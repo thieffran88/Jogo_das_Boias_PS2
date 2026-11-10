@@ -24,7 +24,23 @@ void r_rect_grad(float x, float y, float w, float h, rgba_t top, rgba_t bottom);
 void r_atlas(float x, float y, float w, float h,
              float u0, float v0, float u1, float v1, rgba_t c);
 
+/* quadrado texturizado com uma pagina de sprites (assets.h), tingido por c */
+void r_image(int page, float x, float y, float w, float h,
+             float u0, float v0, float u1, float v1, rgba_t c);
+
 /* ---- comuns (render.c) ---- */
+/* sprites (ids SPR_* de assets.h) */
+float r_spr_w(int id);
+float r_spr_h(int id);
+void  r_spr(int id, float x, float y, float w, float h, rgba_t c);
+void  r_spr_inset(int id, float x, float y, float w, float h, rgba_t c);
+void  r_spr_c(int id, float cx, float cy, float scale, rgba_t c);
+void  r_spr_b(int id, float cx, float by, float scale, rgba_t c); /* ancorado embaixo */
+/* fonte amarela de titulos (h = altura das letras) */
+float r_ytext(float x, float y, float h, rgba_t c, const char *s);
+float r_ytext_w(const char *s, float h);
+void  r_ytext_c(float cx, float y, float h, rgba_t c, const char *s);
+
 void  r_shape(int shape, float x, float y, float w, float h, rgba_t c);
 void  r_shape_c(int shape, float cx, float cy, float size, rgba_t c);
 float r_text(float x, float y, float scale, rgba_t c, const char *s);
@@ -32,6 +48,8 @@ float r_text_w(const char *s, float scale);
 void  r_text_c(float cx, float y, float scale, rgba_t c, const char *s);
 void  r_text_shadow(float x, float y, float scale, rgba_t c, const char *s);
 void  r_text_c_shadow(float cx, float y, float scale, rgba_t c, const char *s);
+void  r_text_outline(float x, float y, float scale, rgba_t c, rgba_t o, const char *s);
+void  r_text_c_outline(float cx, float y, float scale, rgba_t c, rgba_t o, const char *s);
 void  r_panel(float x, float y, float w, float h, rgba_t c);
 
 #endif

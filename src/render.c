@@ -98,3 +98,110 @@ void r_panel(float x, float y, float w, float h, rgba_t c)
     r_rect(x, y + cs, cs, h - 2 * cs, c);
     r_rect(x + w - cs, y + cs, cs, h - 2 * cs, c);
 }
+
+/* ------------------------------------------------------------------ */
+/* Sprites                                                             */
+/* ------------------------------------------------------------------ */
+#include "assets.h"
+
+float r_spr_w(int id) { return asset_sprites[id].w; }
+float r_spr_h(int id) { return asset_sprites[id].h; }
+
+void r_spr(int id, float x, float y, float w, float h, rgba_t c)
+{
+    const AssetSprite *s = &asset_sprites[id];
+    r_image(s->page, x, y, w, h, s->x, s->y, s->x + s->w, s->y + s->h, c);
+}
+
+void r_spr_inset(int id, float x, float y, float w, float h, rgba_t c)
+{
+    const AssetSprite *s = &asset_sprites[id];
+    r_image(s->page, x, y, w, h, s->x + 1, s->y + 1, s->x + s->w - 1, s->y + s->h - 1, c);
+}
+
+void r_spr_c(int id, float cx, float cy, float scale, rgba_t c)
+{
+    float w = asset_sprites[id].w * scale, h = asset_sprites[id].h * scale;
+    r_spr(id, cx - w * 0.5f, cy - h * 0.5f, w, h, c);
+}
+
+void r_spr_b(int id, float cx, float by, float scale, rgba_t c)
+{
+    float w = asset_sprites[id].w * scale, h = asset_sprites[id].h * scale;
+    r_spr(id, cx - w * 0.5f, by - h, w, h, c);
+}
+
+void r_text_outline(float x, float y, float scale, rgba_t c, rgba_t o, const char *s)
+{
+    static const signed char d[8][2] = {
+        {-2, 0}, {2, 0}, {0, -2}, {0, 2}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}
+    };
+    int i;
+    for (i = 0; i < 8; i++)
+        r_text(x + d[i][0], y + d[i][1], scale, o, s);
+    r_text(x, y, scale, c, s);
+}
+
+void r_text_c_outline(float cx, float y, float scale, rgba_t c, rgba_t o, const char *s)
+{
+    r_text_outline(cx - r_text_w(s, scale) * 0.5f, y, scale, c, o, s);
+}
+
+/* Fonte amarela: so maiusculas, numeros e alguma pontuacao. */
+static int ychar(const unsigned char **ps)
+{
+    const unsigned char *s = *ps;
+    unsigned int cp;
+    if (s[0] < 0x80) {
+        cp = s[0];
+        *ps = s + 1;
+    } else if ((s[0] & 0xE0) == 0xC0 && s[1]) {
+        cp = ((s[0] & 0x1Fu) << 6) | (s[1] & 0x3Fu);
+        *ps = s + 2;
+    } else {
+        *ps = s + 1;
+        return '?';
+    }
+    if (cp >= 'a' && cp <= 'z') return (int)(cp - 32);
+    if ((cp >= 0xC0 && cp <= 0xC5) || (cp >= 0xE0 && cp <= 0xE5)) return 'A';
+    if (cp == 0xC7 || cp == 0xE7) return 'C';
+    if ((cp >= 0xC8 && cp <= 0xCB) || (cp >= 0xE8 && cp <= 0xEB)) return 'E';
+    if ((cp >= 0xCC && cp <= 0xCF) || (cp >= 0xEC && cp <= 0xEF)) return 'I';
+    if ((cp >= 0xD2 && cp <= 0xD6) || (cp >= 0xF2 && cp <= 0xF6)) return 'O';
+    if ((cp >= 0xD9 && cp <= 0xDC) || (cp >= 0xF9 && cp <= 0xFC)) return 'U';
+    if (cp < 128) return (int)cp;
+    return '?';
+}
+
+float r_ytext_w(const char *str, float h)
+{
+    const unsigned char *s = (const unsigned char *)str;
+    float k = h / YFONT_H, w = 0;
+    while (*s) {
+        int ch = ychar(&s);
+        if (ch == ' ' || yfont_map[ch] < 0) w += h * 0.35f;
+        else w += asset_sprites[yfont_map[ch]].w * k - h * 0.06f;
+    }
+    return w;
+}
+
+float r_ytext(float x, float y, float h, rgba_t c, const char *str)
+{
+    const unsigned char *s = (const unsigned char *)str;
+    float k = h / YFONT_H;
+    while (*s) {
+        int ch = ychar(&s);
+        if (ch == ' ' || yfont_map[ch] < 0) {
+            x += h * 0.35f;
+            continue;
+        }
+        r_spr(yfont_map[ch], x, y, asset_sprites[yfont_map[ch]].w * k, h, c);
+        x += asset_sprites[yfont_map[ch]].w * k - h * 0.06f;
+    }
+    return x;
+}
+
+void r_ytext_c(float cx, float y, float h, rgba_t c, const char *s)
+{
+    r_ytext(cx - r_ytext_w(s, h) * 0.5f, y, h, c, s);
+}

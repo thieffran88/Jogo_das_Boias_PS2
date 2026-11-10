@@ -14,6 +14,7 @@
 #include "../src/render.h"
 #include "../src/atlas.h"
 #include "../src/ui.h"
+#include "../src/assets.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -108,6 +109,56 @@ void r_atlas(float x, float y, float w, float h,
             al = sample(u, v) * CA(c);
             blend(i, j, CR(c), CG(c), CB(c), al);
         }
+}
+
+/* amostra bilinear (pre-multiplicada) de uma pagina T8 + paleta */
+static void sample_page(int page, float u, float v, float out[4])
+{
+    const unsigned char *idx = assets_bin + asset_pages[page].idx_off;
+    const unsigned char *pal = assets_bin + asset_pages[page].pal_off;
+    int W = ASSET_PAGE_SIZE, H = (int)asset_pages[page].h;
+    int x0, y0, k, dx, dy;
+    float fx, fy;
+    u -= 0.5f; v -= 0.5f;
+    x0 = (int)floorf(u); y0 = (int)floorf(v);
+    fx = u - x0; fy = v - y0;
+    out[0] = out[1] = out[2] = out[3] = 0;
+    for (dy = 0; dy < 2; dy++)
+        for (dx = 0; dx < 2; dx++) {
+            int xx = x0 + dx, yy = y0 + dy;
+            float wgt = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy);
+            const unsigned char *p;
+            float a;
+            if (xx < 0) xx = 0;
+            if (yy < 0) yy = 0;
+            if (xx >= W) xx = W - 1;
+            if (yy >= H) yy = H - 1;
+            p = pal + 4 * idx[yy * W + xx];
+            a = p[3] / 255.0f;
+            for (k = 0; k < 3; k++) out[k] += p[k] / 255.0f * a * wgt;
+            out[3] += a * wgt;
+        }
+}
+
+void r_image(int page, float x, float y, float w, float h,
+             float u0, float v0, float u1, float v1, rgba_t c)
+{
+    int ix0 = (int)floorf(x), iy0 = (int)floorf(y);
+    int ix1 = (int)ceilf(x + w), iy1 = (int)ceilf(y + h);
+    int i, j;
+    if (w <= 0 || h <= 0) return;
+    for (j = iy0; j < iy1; j++) {
+        if (j < 0 || j >= SCREEN_H) continue;
+        for (i = ix0; i < ix1; i++) {
+            float px = i + 0.5f, py = j + 0.5f, s[4], a;
+            if (i < 0 || i >= SCREEN_W) continue;
+            if (px < x || py < y || px > x + w || py > y + h) continue;
+            sample_page(page, u0 + (px - x) / w * (u1 - u0), v0 + (py - y) / h * (v1 - v0), s);
+            a = s[3] * CA(c);
+            if (s[3] <= 0.001f) continue;
+            blend(i, j, s[0] / s[3] * CR(c), s[1] / s[3] * CG(c), s[2] / s[3] * CB(c), a);
+        }
+    }
 }
 
 static void save(const char *dir, const char *name)
