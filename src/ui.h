@@ -19,8 +19,10 @@ enum {
 unsigned int platform_ticks(void);
 
 void ui_init(void);
-/* pressed = botoes que acabaram de ser apertados neste quadro */
-void ui_update(unsigned int pressed);
+/* Botoes que acabaram de ser apertados neste quadro em cada controle.
+ * Menus aceitam os dois controles; na partida, o controle 1 joga so pelo
+ * Jogador 1 e o controle 2 joga pelos Jogadores 2, 3 e 4. */
+void ui_update(unsigned int pad1, unsigned int pad2);
 void ui_draw(void);
 
 #endif

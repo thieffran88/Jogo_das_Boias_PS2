@@ -6,8 +6,9 @@
  *   ./build/sim saida_dir "script"
  *
  * O script e uma lista separada por espacos de comandos:
- *   X O T Q S L R U D   botoes (cruz, bola, triangulo, quadrado, start,
- *                       esquerda, direita, cima, baixo)
+ *   X O T Q S L R U D   botoes do controle 1 (cruz, bola, triangulo,
+ *                       quadrado, start, esquerda, direita, cima, baixo)
+ *   2X 2O ...           o mesmo botao no controle 2
  *   wN                  espera N quadros
  *   shot:nome           grava nome.ppm
  */
@@ -222,11 +223,14 @@ static void wav_close(void)
     fclose(wav);
 }
 
-static void frame(unsigned int pressed)
+static void frame2(unsigned int p1, unsigned int p2);
+static void frame(unsigned int pressed) { frame2(pressed, 0); }
+
+static void frame2(unsigned int pressed, unsigned int pad2)
 {
     static short buf[AUDIO_RATE / 60 * 2];
     ticks += 7919;
-    ui_update(pressed);
+    ui_update(pressed, pad2);
     audio_render(buf, AUDIO_RATE / 60);
     if (wav) {
         fwrite(buf, 4, AUDIO_RATE / 60, wav);
@@ -260,19 +264,24 @@ int main(int argc, char **argv)
             save(argv[1], tok + 5);
             continue;
         }
-        switch (tok[0]) {
-        case 'X': b = BTN_CROSS; break;
-        case 'O': b = BTN_CIRCLE; break;
-        case 'T': b = BTN_TRIANGLE; break;
-        case 'Q': b = BTN_SQUARE; break;
-        case 'S': b = BTN_START; break;
-        case 'L': b = BTN_LEFT; break;
-        case 'R': b = BTN_RIGHT; break;
-        case 'U': b = BTN_UP; break;
-        case 'D': b = BTN_DOWN; break;
+        {
+            int pad2 = tok[0] == '2' && tok[1];
+            const char *k = pad2 ? tok + 1 : tok;
+            switch (k[0]) {
+            case 'X': b = BTN_CROSS; break;
+            case 'O': b = BTN_CIRCLE; break;
+            case 'T': b = BTN_TRIANGLE; break;
+            case 'Q': b = BTN_SQUARE; break;
+            case 'S': b = BTN_START; break;
+            case 'L': b = BTN_LEFT; break;
+            case 'R': b = BTN_RIGHT; break;
+            case 'U': b = BTN_UP; break;
+            case 'D': b = BTN_DOWN; break;
+            }
+            if (pad2) frame2(0, b);
+            else frame(b);
+            frame(0);
         }
-        frame(b);
-        frame(0);
     }
     wav_close();
     return 0;

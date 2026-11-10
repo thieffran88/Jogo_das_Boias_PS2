@@ -81,6 +81,7 @@ const char *const TXT[T_COUNT][LANG_COUNT] = {
     /* T_MUSIC_ON */ { "Música: ligada", "Music: on", "Música: activada" },
     /* T_MUSIC_OFF */ { "Música: desligada", "Music: off", "Música: desactivada" },
     /* T_LANGUAGE */ { "Idioma", "Language", "Idioma" },
+    /* T_PAD_N */ { "Controle %d", "Controller %d", "Mando %d" },
     /* T_BTN_PLAY */ { "JOGAR", "PLAY", "JUGAR" },
     /* T_BTN_HOWTO */ { "COMO JOGAR", "HOW TO PLAY", "CÓMO JUGAR" },
     /* T_BTN_CREDITS */ { "CRÉDITOS", "CREDITS", "CRÉDITOS" },
@@ -125,9 +126,10 @@ const char *const RULE_BODY[LANG_COUNT][N_RULES] = {
         "Direcional: escolher opção\n"
         "X: confirmar / rolar os dados\n"
         "O: voltar\n"
-        "START: pausar o jogo\n"
-        "SELECT: liga/desliga a música\n"
-        "Jogue com amigos passando o controle, ou contra a CPU."
+        "START: pausar o jogo  |  SELECT: música\n"
+        "Controle 1: Jogador 1 (Vermelho).\n"
+        "Controle 2: Jogadores 2, 3 e 4 (passem o controle 2 entre si).\n"
+        "Menus aceitam os dois controles."
     },
     {
         "Each player starts with 12 floats of their color in stock.\n"
@@ -157,9 +159,10 @@ const char *const RULE_BODY[LANG_COUNT][N_RULES] = {
         "D-pad: choose option\n"
         "X: confirm / roll the dice\n"
         "O: back\n"
-        "START: pause the game\n"
-        "SELECT: music on/off\n"
-        "Play with friends by passing the controller, or against the CPU."
+        "START: pause  |  SELECT: music on/off\n"
+        "Controller 1: Player 1 (Red).\n"
+        "Controller 2: Players 2, 3 and 4 (pass controller 2 around).\n"
+        "Menus accept both controllers."
     },
     {
         "Cada jugador empieza con 12 flotadores de su color en la reserva.\n"
@@ -189,8 +192,9 @@ const char *const RULE_BODY[LANG_COUNT][N_RULES] = {
         "Cruceta: elegir opción\n"
         "X: confirmar / lanzar los dados\n"
         "O: volver\n"
-        "START: pausar el juego\n"
-        "SELECT: activar/desactivar la música\n"
-        "Juega con amigos pasando el mando, o contra la CPU."
+        "START: pausa  |  SELECT: música\n"
+        "Mando 1: Jugador 1 (Rojo).\n"
+        "Mando 2: Jugadores 2, 3 y 4 (pásense el mando 2).\n"
+        "Los menús aceptan los dos mandos."
     },
 };

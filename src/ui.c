@@ -120,6 +120,12 @@ static struct {
 /* Utilidades                                                          */
 /* ------------------------------------------------------------------ */
 
+/* entrada de cada controle neste quadro */
+static unsigned int pad_in[2];
+
+/* Controle do jogador: controle 1 para o Jogador 1, controle 2 para os demais. */
+static int pad_of(int player) { return player == 0 ? 0 : 1; }
+
 static unsigned int ui_rand_state = 0x9E3779B9u;
 static int urand(int n)
 {
@@ -559,7 +565,10 @@ static void draw_bottom_bar(void)
             r_text_shadow(CARD_X + 6, BAR_Y + 16, 0.8f, C_WHITE, b);
         } else {
             r_spr_c(SPR_ICON_X, CARD_X + 22, BAR_Y + 30, 1.0f + 0.15f * pulse(0.2f), C_WHITE);
-            r_text_shadow(CARD_X + 44, BAR_Y + 16, 0.8f, C_WHITE, T(T_ROLL_DICE));
+            char b[48];
+            r_text_shadow(CARD_X + 44, BAR_Y + 8, 0.8f, C_WHITE, T(T_ROLL_DICE));
+            snprintf(b, sizeof(b), T(T_PAD_N), pad_of(S.g.current) + 1);
+            r_text_shadow(CARD_X + 44, BAR_Y + 34, 0.55f, C_GOLD, b);
         }
     } else if (S.phase == PH_ROLLING) {
         r_text_shadow(CARD_X + 6, BAR_Y + 16, 0.8f, C_DIM, T(T_ROLLING));
@@ -816,7 +825,8 @@ static void update_game(unsigned int pressed)
         }
         break;
     case PH_WAIT_ROLL:
-        if (S.g.is_cpu[S.g.current] ? S.timer >= 40 : (pressed & BTN_CROSS) != 0) {
+        if (S.g.is_cpu[S.g.current] ? S.timer >= 40
+                                     : (pad_in[pad_of(S.g.current)] & BTN_CROSS) != 0) {
             S.phase = PH_ROLLING;
             S.timer = 0;
             audio_sfx(SFX_DICE);
@@ -846,6 +856,9 @@ static void update_game(unsigned int pressed)
                 pressed |= BTN_CROSS;
             else
                 pressed = 0;
+        } else {
+            /* so o controle deste jogador escolhe a jogada */
+            pressed = pad_in[pad_of(S.g.current)];
         }
         if (pressed & (BTN_LEFT | BTN_RIGHT)) audio_sfx(SFX_MOVE);
         if (pressed & BTN_LEFT) S.sel = (S.sel + S.n_moves - 1) % S.n_moves;
@@ -988,12 +1001,17 @@ static void draw_setup(void)
         float bob = sel ? sinf(S.frame * 0.15f) * 3 : 0;
         if (sel) r_panel(x - 4, y - 4, 146, 206, WITH_ALPHA(RGB(0xFF8F00), (int)(170 + 80 * pulse(0.2f))));
         r_panel(x, y, 138, 198, on ? RGBA(255, 246, 224, 235) : RGBA(255, 246, 224, 110));
-        r_spr_b(P_CHAR[i], x + 69, y + 120 + bob, 0.86f, tint);
-        r_text_c(x + 69, y + 124, 0.75f, on ? C_INK : RGBA(13, 59, 102, 110), PNAME[i]);
+        r_spr_b(P_CHAR[i], x + 69, y + 110 + bob, 0.8f, tint);
+        r_text_c(x + 69, y + 110, 0.75f, on ? C_INK : RGBA(13, 59, 102, 110), PNAME[i]);
         if (on) {
             const char *mode = S.setup_cpu[i] ? "CPU" : T(T_HUMAN);
             r_panel(x + 12, y + 156, 114, 32, S.setup_cpu[i] ? RGB(0x5C6BC0) : RGB(0x43A047));
             r_text_c(x + 69, y + 158, 0.72f, C_WHITE, mode);
+            if (!S.setup_cpu[i]) {
+                char pb[32];
+                snprintf(pb, sizeof(pb), T(T_PAD_N), pad_of(i) + 1);
+                r_text_c(x + 69, y + 135, 0.5f, RGB(0x37474F), pb);
+            }
         } else {
             r_text_c(x + 69, y + 160, 0.65f, RGBA(13, 59, 102, 120), T(T_OUT));
         }
@@ -1139,8 +1157,9 @@ static void update_setup(unsigned int pressed)
 static void ui_update_screens(unsigned int pressed);
 
 /* Sons de menu, musica de cada tela e liga/desliga da musica (SELECT). */
-void ui_update(unsigned int pressed)
+void ui_update(unsigned int pad1, unsigned int pad2)
 {
+    unsigned int pressed = pad1 | pad2;
     int prev_screen = S.screen, prev_paused = S.paused;
     int prev_menu = S.menu_sel, prev_row = S.setup_row, prev_card = S.setup_card;
     int prev_players = S.setup_players, prev_page = S.rules_page, prev_psel = S.pause_sel;
@@ -1148,6 +1167,8 @@ void ui_update(unsigned int pressed)
     int prev_cpu = S.setup_cpu[0] | S.setup_cpu[1] << 1 | S.setup_cpu[2] << 2 | S.setup_cpu[3] << 3;
     int cpu;
 
+    pad_in[0] = pad1;
+    pad_in[1] = pad2;
     if (pressed & BTN_SELECT) {
         audio_set_music_on(!audio_music_on());
         S.toast_timer = 100;

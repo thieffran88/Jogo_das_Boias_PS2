@@ -42,11 +42,16 @@ primeira tela e pode ser trocado no título com △.
 | △ (no título) | trocar o idioma |
 | SELECT | liga/desliga a música |
 
+**Controles por jogador:** o **controle 1** joga apenas pelo Jogador 1
+(Vermelho). O **controle 2** joga pelos Jogadores 2, 3 e 4 (passem o controle 2
+entre si) e não age na vez do Jogador 1. Menus, pausa e telas fora da
+partida aceitam os dois controles. A tela de jogadores mostra o controle de
+cada humano, e a barra inferior indica qual controle deve rolar os dados.
+
 No jogo, as cartas na parte de baixo mostram cada forma de usar os dados.
 As raias que vão receber boias ficam destacadas, e as boias que seriam
 expulsas ficam marcadas (em vermelho quando a jogada causaria penalidade).
 A estrela indica uma jogada que soma 7 e dá bônus.
-Os jogadores humanos se revezam no mesmo controle (as portas 1 e 2 funcionam).
 
 ## Rodando
 
@@ -93,7 +98,8 @@ make sim
 ./build/sim /tmp "w30 shot:titulo X w3 S w200 X w60 shot:jogo"
 ```
 
-Comandos do roteiro: `X O T Q S L R U D` (botões), `wN` (espera N quadros),
+Comandos do roteiro: `X O T Q S L R U D` (botões do controle 1; com prefixo
+`2`, como `2X`, no controle 2), `wN` (espera N quadros),
 `shot:nome` (salva captura).
 
 ## Estrutura

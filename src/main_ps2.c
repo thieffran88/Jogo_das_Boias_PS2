@@ -217,16 +217,18 @@ static void init_pads(void)
         pad_ok[port] = padPortOpen(port, 0, pad_buf[port]) != 0;
 }
 
-static unsigned int read_pads(void)
+/* Le as duas portas separadamente: pressed[0] = controle 1, [1] = controle 2. */
+static void read_pads(unsigned int pressed[2])
 {
-    static unsigned int prev = 0;
-    unsigned int now = 0, pressed;
+    static unsigned int prev[2];
     int port;
     for (port = 0; port < 2; port++) {
         struct padButtonStatus st;
         int state;
         unsigned short btn;
-        if (!pad_ok[port]) continue;
+        unsigned int now = 0;
+        pressed[port] = 0;
+        if (!pad_ok[port]) { prev[port] = 0; continue; }
         state = padGetState(port, 0);
         if (state != PAD_STATE_STABLE && state != PAD_STATE_FINDCTP1) continue;
         if (padRead(port, 0, &st) == 0) continue;
@@ -241,10 +243,9 @@ static unsigned int read_pads(void)
         if (btn & PAD_SQUARE) now |= BTN_SQUARE;
         if (btn & PAD_START) now |= BTN_START;
         if (btn & PAD_SELECT) now |= BTN_SELECT;
+        pressed[port] = now & ~prev[port];
+        prev[port] = now;
     }
-    pressed = now & ~prev;
-    prev = now;
-    return pressed;
 }
 
 static void init_gfx(void)
@@ -294,8 +295,9 @@ int main(int argc, char **argv)
     ui_init();
 
     for (;;) {
-        unsigned int pressed = read_pads();
-        ui_update(pressed);
+        unsigned int pressed[2];
+        read_pads(pressed);
+        ui_update(pressed[0], pressed[1]);
         r_begin(RGBA(0, 0, 0, 255));
         ui_draw();
         r_end();
