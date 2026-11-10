@@ -36,6 +36,7 @@ e o [gsKit](https://github.com/ps2dev/gsKit).
 | X | confirmar / rolar os dados |
 | O | voltar |
 | START | pausar (continuar, ver regras, sair) |
+| SELECT | liga/desliga a música |
 
 No jogo, as cartas na parte de baixo mostram cada forma de usar os dados.
 As raias que vão receber boias ficam destacadas, e as boias que seriam
@@ -98,10 +99,35 @@ src/render.c/h    camada de desenho (texto, formas, painéis)
 src/main_ps2.c    backend PS2: gsKit (vídeo) + libpad (controles)
 src/atlas.h       fonte e formas geradas por tools/gen_atlas.py (make atlas)
 src/assets.h/.c   tabela de sprites e o assets.bin embutido (make assets)
+src/audio.c/h     sintetizador, músicas, efeitos e mixer
+src/irx.c         módulo audsrv.irx embutido (PS2)
+tools/audio_demo.c  prévias em WAV (make audio-demo)
 assets/src/       folhas de sprites originais
 tools/sim.c       backend de PC para capturas de tela
 tests/            testes das regras (inclui 300 partidas simuladas)
 iso/SYSTEM.CNF    boot do CD
+```
+
+## Música e efeitos sonoros
+
+Todo o som é sintetizado pelo próprio jogo em `src/audio.c` (sem arquivos de
+áudio): steel drum, marimba, baixo, shaker, bongô e bumbo, mais os efeitos
+de piscina. As músicas são composições originais:
+
+- **Título:** calipso animado (112 BPM) com steel drum.
+- **Partida:** tema tranquilo com marimba (92 BPM), para não cansar.
+- **Vitória:** fanfarra curta com brilhos.
+
+Efeitos: splash e bolhas quando a boia cai na água, "boing" quando uma boia é
+expulsa, **apito do salva-vidas** na penalidade, sino na raia 7, brilho no
+bônus, dados chacoalhando e caindo, e bolhinhas nos menus.
+
+No PS2 o som sai pelo `audsrv` (módulo do IOP embutido no ELF), alimentado
+por uma thread de áudio própria a 48 kHz estéreo. Para ouvir no PC:
+
+```sh
+make audio-demo   # gera build/audio/*.wav (músicas e efeitos)
+SIM_WAV=/tmp/sessao.wav ./build/sim /tmp "w600 X w5 S w600"   # som de uma sessão
 ```
 
 ## Gráficos

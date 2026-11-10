@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
+#include <audsrv.h>
+#include <sbv_patches.h>
 
 #include <gsKit.h>
 #include <dmaKit.h>
@@ -16,6 +18,7 @@
 #include "atlas.h"
 #include "assets.h"
 #include "ui.h"
+#include "audio.h"
 
 static GSGLOBAL *gs;
 static GSTEXTURE atlas_tex;
@@ -139,10 +142,62 @@ static int upload_t8(GSTEXTURE *t, const unsigned char *idx, int w, int h,
     return 0;
 }
 
+/* ---- audio: thread propria que mistura e envia blocos ao audsrv ---- */
+
+extern unsigned char audsrv_irx[], audsrv_irx_end[];
+
+#define AUDIO_CHUNK_FRAMES 512   /* 2 KB = um "feed" do audsrv a 48 kHz */
+static short audio_buf[AUDIO_CHUNK_FRAMES * 2] __attribute__((aligned(64)));
+static unsigned char audio_stack[16 * 1024] __attribute__((aligned(16)));
+
+static void audio_thread(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        audio_render(audio_buf, AUDIO_CHUNK_FRAMES);
+        /* bloqueia (dormindo) ate caber no buffer de ~100 ms do audsrv */
+        audsrv_wait_audio(sizeof(audio_buf));
+        audsrv_play_audio((const char *)audio_buf, sizeof(audio_buf));
+    }
+}
+
+static void init_audio(void)
+{
+    int ret = 0, id;
+    struct audsrv_fmt_t fmt;
+    ee_thread_t th;
+
+    audio_init(); /* sintetiza os instrumentos e efeitos */
+
+    if (SifLoadModule("rom0:LIBSD", 0, NULL) < 0) return;
+    if (SifExecModuleBuffer(audsrv_irx, audsrv_irx_end - audsrv_irx, 0, NULL, &ret) < 0) return;
+    if (audsrv_init() != 0) return;
+
+    fmt.bits = 16;
+    fmt.freq = AUDIO_RATE;
+    fmt.channels = 2;
+    if (audsrv_set_format(&fmt) != AUDSRV_ERR_NOERROR) return;
+    audsrv_set_volume(MAX_VOLUME);
+
+    /* a thread de audio tem prioridade maior que a principal */
+    ChangeThreadPriority(GetThreadId(), 64);
+    memset(&th, 0, sizeof(th));
+    th.func = (void *)audio_thread;
+    th.stack = audio_stack;
+    th.stack_size = sizeof(audio_stack);
+    th.gp_reg = &_gp;
+    th.initial_priority = 40;
+    id = CreateThread(&th);
+    if (id >= 0) StartThread(id, NULL);
+}
+
 static void load_modules(void)
 {
     int ret;
     SifInitRpc(0);
+    /* permite carregar modulos do IOP a partir da memoria do EE */
+    sbv_patch_enable_lmb();
+    sbv_patch_disable_prefix_check();
     ret = SifLoadModule("rom0:SIO2MAN", 0, NULL);
     if (ret < 0) SleepThread();
     ret = SifLoadModule("rom0:PADMAN", 0, NULL);
@@ -230,6 +285,7 @@ int main(int argc, char **argv)
     load_modules();
     init_pads();
     init_gfx();
+    init_audio();
     ui_init();
 
     for (;;) {

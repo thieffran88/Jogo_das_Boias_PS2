@@ -8,6 +8,7 @@
 #include "assets.h"
 #include "game.h"
 #include "ai.h"
+#include "audio.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -107,6 +108,7 @@ static struct {
     int react_player, react_kind, react_timer;
 
     int paused, pause_sel;
+    int toast_timer;
 
     Fly fly[MAX_FLY];
     int n_fly;
@@ -577,6 +579,7 @@ static void begin_turn(void)
 {
     S.phase = PH_WAIT_ROLL;
     S.timer = 0;
+    audio_sfx(SFX_POP);
     if (!S.g.bonus_roll) {
         char b[64];
         snprintf(b, sizeof(b), "Vez do %s.", PNAME[S.g.current]);
@@ -616,6 +619,7 @@ static void finish_move(void)
     }
     if (game_end_move(&S.g, &S.cur)) {
         S.banner_timer = 90;
+        audio_sfx(SFX_SPARKLE);
         react(S.g.current, REACT_HAPPY);
         snprintf(b, sizeof(b), "Somou 7! %s ganha mais um lance.", PNAME[S.g.current]);
         set_msg(C_GOLD, b);
@@ -662,6 +666,7 @@ static void apply_place(void)
 
     if (lane == SAFE_LANE) {
         set_msg(C_GOLD, "Boia segura com o salva-vidas da raia 7!");
+        audio_sfx(SFX_CHIME);
     } else if (r.penalty) {
         float px, py;
         panel_center(me, &px, &py);
@@ -675,6 +680,7 @@ static void apply_place(void)
                  PNAME[me], r.penalty_n, lane);
         S.msg_col = C_DANGER;
         react(me, REACT_SAD);
+        audio_sfx(SFX_WHISTLE);
     } else if (r.kicked != NO_CHIP) {
         float px, py;
         panel_center(r.kicked, &px, &py);
@@ -683,8 +689,10 @@ static void apply_place(void)
                  PCOR_F[r.kicked], lane, PNAME[r.kicked]);
         S.msg_col = RGB(0xFFEB3B);
         react(r.kicked, REACT_SAD);
+        audio_sfx(SFX_BOING);
     } else {
         snprintf(S.msg, sizeof(S.msg), "Boia colocada na raia %d.", lane);
+        audio_sfx(SFX_SPLASH);
         S.msg_col = C_WHITE;
     }
 }
@@ -726,7 +734,9 @@ static void update_game(unsigned int pressed)
 
     switch (S.phase) {
     case PH_START_ROLL:
+        if (S.timer == 1) audio_sfx(SFX_DICE);
         if (S.timer >= 45) {
+            audio_sfx(SFX_DICE_LAND);
             int best = 0, nbest = 0;
             for (p = 0; p < S.g.num_players; p++)
                 if (S.start_active[p]) {
@@ -767,6 +777,7 @@ static void update_game(unsigned int pressed)
         if (S.g.is_cpu[S.g.current] ? S.timer >= 40 : (pressed & BTN_CROSS) != 0) {
             S.phase = PH_ROLLING;
             S.timer = 0;
+            audio_sfx(SFX_DICE);
         }
         break;
     case PH_ROLLING:
@@ -774,6 +785,7 @@ static void update_game(unsigned int pressed)
             for (p = 0; p < 3; p++) S.dice_show[p] = 1 + urand(6);
         if (S.timer >= 36) {
             game_roll(&S.g);
+            audio_sfx(SFX_DICE_LAND);
             S.n_moves = game_moves(&S.g, S.moves);
             S.sel = 0;
             S.cpu_target = S.g.is_cpu[S.g.current] ? ai_choose(&S.g, S.moves, S.n_moves) : 0;
@@ -784,16 +796,20 @@ static void update_game(unsigned int pressed)
         break;
     case PH_CHOOSE:
         if (S.g.is_cpu[S.g.current]) {
-            if (S.timer % 14 == 0 && S.sel != S.cpu_target)
+            if (S.timer % 14 == 0 && S.sel != S.cpu_target) {
                 S.sel += S.sel < S.cpu_target ? 1 : -1;
+                audio_sfx(SFX_MOVE);
+            }
             if (S.timer >= 30 && S.sel == S.cpu_target && S.timer % 14 == 13)
                 pressed |= BTN_CROSS;
             else
                 pressed = 0;
         }
+        if (pressed & (BTN_LEFT | BTN_RIGHT)) audio_sfx(SFX_MOVE);
         if (pressed & BTN_LEFT) S.sel = (S.sel + S.n_moves - 1) % S.n_moves;
         if (pressed & BTN_RIGHT) S.sel = (S.sel + 1) % S.n_moves;
         if (pressed & BTN_CROSS) {
+            audio_sfx(SFX_CONFIRM);
             S.cur = S.moves[S.sel];
             S.place_idx = 0;
             start_place();
@@ -851,6 +867,7 @@ static const char *RULE_TEXT[] = {
     "X: confirmar / rolar os dados\n"
     "O: voltar\n"
     "START: pausar o jogo\n"
+    "SELECT: liga/desliga a música\n"
     "Jogue com amigos passando o controle, ou contra a CPU."
 };
 #define N_RULES 6
@@ -1049,7 +1066,45 @@ static void update_setup(unsigned int pressed)
         S.screen = SCR_TITLE;
 }
 
+static void ui_update_screens(unsigned int pressed);
+
+/* Sons de menu, musica de cada tela e liga/desliga da musica (SELECT). */
 void ui_update(unsigned int pressed)
+{
+    int prev_screen = S.screen, prev_paused = S.paused;
+    int prev_menu = S.menu_sel, prev_row = S.setup_row, prev_card = S.setup_card;
+    int prev_players = S.setup_players, prev_page = S.rules_page, prev_psel = S.pause_sel;
+    int prev_cpu = S.setup_cpu[0] | S.setup_cpu[1] << 1 | S.setup_cpu[2] << 2 | S.setup_cpu[3] << 3;
+    int cpu;
+
+    if (pressed & BTN_SELECT) {
+        audio_set_music_on(!audio_music_on());
+        S.toast_timer = 100;
+    }
+    if (S.toast_timer > 0) S.toast_timer--;
+
+    ui_update_screens(pressed);
+
+    cpu = S.setup_cpu[0] | S.setup_cpu[1] << 1 | S.setup_cpu[2] << 2 | S.setup_cpu[3] << 3;
+    if (S.screen != prev_screen || S.paused != prev_paused) {
+        if (S.paused != prev_paused && S.screen == SCR_GAME) audio_sfx(SFX_PAUSE);
+        else if (pressed & BTN_CIRCLE) audio_sfx(SFX_BACK);
+        else audio_sfx(SFX_CONFIRM);
+    } else if (S.menu_sel != prev_menu || S.setup_row != prev_row || S.setup_card != prev_card ||
+               S.setup_players != prev_players || S.rules_page != prev_page ||
+               S.pause_sel != prev_psel) {
+        audio_sfx(SFX_MOVE);
+    } else if (cpu != prev_cpu) {
+        audio_sfx(SFX_POP);
+    }
+
+    if (S.screen == SCR_GAME)
+        audio_music(S.phase == PH_GAMEOVER ? SONG_WIN : SONG_GAME);
+    else
+        audio_music(SONG_TITLE);
+}
+
+static void ui_update_screens(unsigned int pressed)
 {
     S.frame++;
     ui_rand_state ^= S.frame * 0x9E3779B9u;
@@ -1101,5 +1156,12 @@ void ui_draw(void)
     case SCR_RULES: draw_rules(); break;
     case SCR_CREDITS: draw_credits(); break;
     case SCR_GAME: draw_game(); break;
+    }
+    if (S.toast_timer > 0) {
+        const char *t = audio_music_on() ? "Música: ligada" : "Música: desligada";
+        int a = S.toast_timer > 20 ? 230 : S.toast_timer * 230 / 20;
+        float w = r_text_w(t, 0.7f) + 40;
+        r_panel(320 - w / 2, 54, w, 34, RGBA(8, 52, 96, a));
+        r_text_c(320, 58, 0.7f, RGBA(255, 255, 255, a), t);
     }
 }

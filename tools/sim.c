@@ -15,6 +15,7 @@
 #include "../src/atlas.h"
 #include "../src/ui.h"
 #include "../src/assets.h"
+#include "../src/audio.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -181,10 +182,39 @@ static void save(const char *dir, const char *name)
     fclose(f);
 }
 
+/* Audio: se SIM_WAV estiver definido, grava o som da sessao em WAV. */
+static FILE *wav;
+static long wav_frames;
+
+static void wav_u32(unsigned int v) { fputc(v & 255, wav); fputc(v >> 8 & 255, wav); fputc(v >> 16 & 255, wav); fputc(v >> 24, wav); }
+
+static void wav_open(const char *path)
+{
+    wav = fopen(path, "wb");
+    if (!wav) { perror(path); exit(1); }
+    fwrite("RIFF\0\0\0\0WAVEfmt ", 1, 16, wav);
+    wav_u32(16); wav_u32(1 | (2 << 16)); wav_u32(AUDIO_RATE); wav_u32(AUDIO_RATE * 4); wav_u32(4 | (16 << 16));
+    fwrite("data\0\0\0\0", 1, 8, wav);
+}
+
+static void wav_close(void)
+{
+    if (!wav) return;
+    fseek(wav, 4, SEEK_SET); wav_u32(36 + wav_frames * 4);
+    fseek(wav, 40, SEEK_SET); wav_u32(wav_frames * 4);
+    fclose(wav);
+}
+
 static void frame(unsigned int pressed)
 {
+    static short buf[AUDIO_RATE / 60 * 2];
     ticks += 7919;
     ui_update(pressed);
+    audio_render(buf, AUDIO_RATE / 60);
+    if (wav) {
+        fwrite(buf, 4, AUDIO_RATE / 60, wav);
+        wav_frames += AUDIO_RATE / 60;
+    }
     r_begin(RGBA(0, 0, 0, 255));
     ui_draw();
     r_end();
@@ -198,6 +228,8 @@ int main(int argc, char **argv)
         return 1;
     }
     script = strdup(argv[2]);
+    audio_init();
+    if (getenv("SIM_WAV")) wav_open(getenv("SIM_WAV"));
     ui_init();
     frame(0);
     for (tok = strtok(script, " "); tok; tok = strtok(NULL, " ")) {
@@ -225,5 +257,6 @@ int main(int argc, char **argv)
         frame(b);
         frame(0);
     }
+    wav_close();
     return 0;
 }
