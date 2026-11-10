@@ -7,7 +7,7 @@
 
 EE_BIN       = jogo_das_boias_unpacked.elf
 EE_BIN_PKD   = jogo_das_boias.elf
-EE_OBJS      = src/main_ps2.o src/ui.o src/render.o src/game.o src/ai.o src/assets.o src/audio.o src/irx.o
+EE_OBJS      = src/main_ps2.o src/ui.o src/render.o src/game.o src/ai.o src/assets.o src/audio.o src/lang.o src/irx.o
 EE_INCS     += -I$(GSKIT)/include -Isrc
 EE_LDFLAGS  += -L$(GSKIT)/lib
 EE_LIBS      = -lgskit_toolkit -lgskit -ldmakit -lpad -laudsrv -lpatches -lm
@@ -20,7 +20,7 @@ ISO_NAME   = jogo_das_boias.iso
 ISO_BOOT   = BOIA_000.01
 
 HOST_CC   ?= cc
-HOST_SRCS  = src/ui.c src/render.c src/game.c src/ai.c src/assets.c src/audio.c
+HOST_SRCS  = src/ui.c src/render.c src/game.c src/ai.c src/assets.c src/audio.c src/lang.c
 
 all: $(EE_BIN_PKD)
 

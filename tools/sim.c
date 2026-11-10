@@ -75,6 +75,23 @@ void r_rect(float x, float y, float w, float h, rgba_t c)
     r_rect_grad(x, y, w, h, c, c);
 }
 
+void r_tri(float x1, float y1, float x2, float y2, float x3, float y3, rgba_t c)
+{
+    int x, y;
+    int minx = (int)floorf(fminf(x1, fminf(x2, x3))), maxx = (int)ceilf(fmaxf(x1, fmaxf(x2, x3)));
+    int miny = (int)floorf(fminf(y1, fminf(y2, y3))), maxy = (int)ceilf(fmaxf(y1, fmaxf(y2, y3)));
+    float d = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3);
+    if (fabsf(d) < 1e-6f) return;
+    for (y = miny; y < maxy; y++)
+        for (x = minx; x < maxx; x++) {
+            float px = x + 0.5f, py = y + 0.5f;
+            float a = ((y2 - y3) * (px - x3) + (x3 - x2) * (py - y3)) / d;
+            float b = ((y3 - y1) * (px - x3) + (x1 - x3) * (py - y3)) / d;
+            if (a < 0 || b < 0 || a + b > 1) continue;
+            blend(x, y, CR(c), CG(c), CB(c), CA(c));
+        }
+}
+
 static float sample(float u, float v)
 {
     int x0, y0;

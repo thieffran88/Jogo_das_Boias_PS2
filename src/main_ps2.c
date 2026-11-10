@@ -78,6 +78,11 @@ void r_rect_grad(float x, float y, float w, float h, rgba_t top, rgba_t bot)
                             1, a, a, b, b);
 }
 
+void r_tri(float x1, float y1, float x2, float y2, float x3, float y3, rgba_t c)
+{
+    gsKit_prim_triangle(gs, x1 * sx, y1 * sy, x2 * sx, y2 * sy, x3 * sx, y3 * sy, 1, gs_color(c));
+}
+
 void r_atlas(float x, float y, float w, float h,
              float u0, float v0, float u1, float v1, rgba_t c)
 {

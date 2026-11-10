@@ -59,6 +59,9 @@ spr("R_P4_SAD", 2, (675, 434, 789, 534), ("h", 70))
 # Emblemas de fim de jogo
 spr("VICTORY", 1, (33, 8, 278, 222), ("h", 160))
 spr("DEFEAT", 1, (306, 16, 522, 232), ("h", 160))
+# versoes sem o texto em portugues (para ingles/espanhol)
+spr("VICTORY_BASE", 1, (33, 86, 278, 222), ("h", 102), keepall=True)
+spr("DEFEAT_BASE", 1, (306, 78, 522, 232), ("h", 115), keepall=True)
 
 # Dados 1..6
 for i, r in enumerate([(1046, 331, 1104, 389), (1112, 330, 1169, 387),
@@ -82,6 +85,9 @@ spr("BTN_VOLTAR", 2, (1273, 595, 1438, 638), ("h", 40))
 spr("BTN_CREDITOS", 2, (1094, 641, 1265, 685), ("h", 40))
 spr("BTN_SAIR", 2, (1273, 641, 1438, 685), ("h", 40))
 spr("BTN_COMOJOGAR", 1, (19, 835, 230, 879), ("h", 40), keepall=True)
+spr("BTN_BLANK_YELLOW", 2, (1094, 549, 1264, 593), ("h", 40), blank=True)
+spr("BTN_BLANK_BLUE", 2, (1273, 595, 1438, 638), ("h", 40), blank=True)
+spr("BTN_BLANK_RED", 2, (1273, 641, 1438, 685), ("h", 40), blank=True)
 
 # Icones
 spr("ICON_X", 2, (855, 630, 905, 681), ("h", 28))
@@ -177,6 +183,13 @@ def cut_sprite(sheets, d):
     bb = im.getbbox()
     if bb:
         im = im.crop(bb)
+    if d.get("blank"):
+        # apaga o texto do botao repetindo, linha a linha, a cor de uma coluna lateral
+        a = np.array(im)
+        w = a.shape[1]
+        x0, x1 = int(w * 0.2), int(w * 0.8)
+        a[:, x0:x1] = a[:, x0:x0 + 1]
+        im = Image.fromarray(a, "RGBA")
     if d.get("rot"):
         im = im.rotate(d["rot"], expand=True)
     kind, v = d["size"]

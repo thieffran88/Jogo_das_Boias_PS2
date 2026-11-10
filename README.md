@@ -6,9 +6,12 @@ e o [gsKit](https://github.com/ps2dev/gsKit).
 
 ![Tela de jogo](docs/jogo.png)
 
-| Título | Novo jogo | Vitória |
-|---|---|---|
-| ![Título](docs/titulo.png) | ![Configuração](docs/config.png) | ![Vitória](docs/vitoria.png) |
+| Idioma | Título | Novo jogo | Vitória |
+|---|---|---|---|
+| ![Idioma](docs/idioma.png) | ![Título](docs/titulo.png) | ![Configuração](docs/config.png) | ![Vitória](docs/vitoria.png) |
+
+**Idiomas:** Português (padrão), English e Español. O idioma é escolhido na
+primeira tela e pode ser trocado no título com △.
 
 ## Como jogar
 
@@ -36,6 +39,7 @@ e o [gsKit](https://github.com/ps2dev/gsKit).
 | X | confirmar / rolar os dados |
 | O | voltar |
 | START | pausar (continuar, ver regras, sair) |
+| △ (no título) | trocar o idioma |
 | SELECT | liga/desliga a música |
 
 No jogo, as cartas na parte de baixo mostram cada forma de usar os dados.
@@ -46,7 +50,8 @@ Os jogadores humanos se revezam no mesmo controle (as portas 1 e 2 funcionam).
 
 ## Rodando
 
-Os arquivos prontos ficam em [`dist/`](dist):
+Baixe o ELF/ISO na página de **Releases** do repositório, ou use os arquivos
+em [`dist/`](dist):
 
 - `jogo_das_boias.elf`: executável do PS2.
   - **Emulador PCSX2:** *Sistema → Iniciar ELF* (ou *Boot ELF*).
@@ -74,7 +79,9 @@ docker run --rm -v "$PWD":/src -w /src ghcr.io/ps2dev/ps2dev:latest \
 ```
 
 O GitHub Actions (`.github/workflows/build.yml`) roda os testes e gera o ELF e
-a ISO como artefatos a cada push.
+a ISO como artefatos a cada push. Ao enviar uma tag `vX.Y.Z`
+(`git tag v1.1.0 && git push origin v1.1.0`) ele também publica um release
+com o ELF e a ISO.
 
 ### Simulador de PC
 
@@ -100,6 +107,7 @@ src/main_ps2.c    backend PS2: gsKit (vídeo) + libpad (controles)
 src/atlas.h       fonte e formas geradas por tools/gen_atlas.py (make atlas)
 src/assets.h/.c   tabela de sprites e o assets.bin embutido (make assets)
 src/audio.c/h     sintetizador, músicas, efeitos e mixer
+src/lang.c/h      textos em português, inglês e espanhol
 src/irx.c         módulo audsrv.irx embutido (PS2)
 tools/audio_demo.c  prévias em WAV (make audio-demo)
 assets/src/       folhas de sprites originais

@@ -2,6 +2,8 @@ name: Build PS2
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -27,5 +29,31 @@ jobs:
         with:
           name: jogo-das-boias-ps2
           path: |
+            jogo_das_boias.elf
+            jogo_das_boias.iso
+
+  # Ao enviar uma tag vX.Y.Z, publica o ELF e a ISO em um release.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: jogo-das-boias-ps2
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Jogo das Boias PS2 ${{ github.ref_name }}
+          body: |
+            Jogo das Boias PS2 - homebrew para PlayStation 2.
+
+            - `jogo_das_boias.elf`: abra no PCSX2 (Iniciar ELF) ou no PS2 pelo uLaunchELF.
+            - `jogo_das_boias.iso`: imagem de CD para PCSX2 ou OPL.
+
+            Idiomas: Português, English, Español.
+          files: |
             jogo_das_boias.elf
             jogo_das_boias.iso

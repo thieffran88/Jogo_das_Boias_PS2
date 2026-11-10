@@ -23,7 +23,7 @@ img = Image.new("L", (W, H), 0)
 d = ImageDraw.Draw(img)
 
 # ASCII 32..126 + 1 reservado + acentos do portugues
-EXTRA = "áàâãéêíóôõúçÁÉÇÃÂÊÍÓÔÕÚÀ"
+EXTRA = "áàâãéêíóôõúçÁÉÇÃÂÊÍÓÔÕÚÀñÑ¡¿ü"
 CHARS = [chr(c) for c in range(32, 127)] + ["?"] + list(EXTRA)
 advances = []
 for i, ch in enumerate(CHARS):

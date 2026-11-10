@@ -20,6 +20,7 @@ void r_begin(rgba_t clear);
 void r_end(void);
 void r_rect(float x, float y, float w, float h, rgba_t c);
 void r_rect_grad(float x, float y, float w, float h, rgba_t top, rgba_t bottom);
+void r_tri(float x1, float y1, float x2, float y2, float x3, float y3, rgba_t c);
 /* quadrado texturizado com o atlas (u/v em pixels do atlas), tingido por c */
 void r_atlas(float x, float y, float w, float h,
              float u0, float v0, float u1, float v1, rgba_t c);

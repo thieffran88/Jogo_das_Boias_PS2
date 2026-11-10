@@ -9,6 +9,7 @@
 #include "game.h"
 #include "ai.h"
 #include "audio.h"
+#include "lang.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -18,8 +19,8 @@
 /* Jogadores                                                           */
 /* ------------------------------------------------------------------ */
 
-static const char *PNAME[MAX_PLAYERS] = { "Vermelho", "Amarelo", "Azul", "Verde" };
-static const char *PCOR_F[MAX_PLAYERS] = { "vermelha", "amarela", "azul", "verde" };
+#define PNAME (PLAYER_NAME[g_lang])
+#define PCOR_F (COLOR_ADJ[g_lang])
 static const int P_RING[MAX_PLAYERS] = { SPR_RING_RED, SPR_RING_YELLOW, SPR_RING_BLUE, SPR_RING_GREEN };
 static const int P_CHAR[MAX_PLAYERS] = { SPR_CHAR_P1, SPR_CHAR_P2, SPR_CHAR_P3, SPR_CHAR_P4 };
 static const int P_BADGE[MAX_PLAYERS] = { SPR_BADGE_P1, SPR_BADGE_P2, SPR_BADGE_P3, SPR_BADGE_P4 };
@@ -60,7 +61,7 @@ static const int P_REACT[MAX_PLAYERS][3] = {
 #define CARD_W 78.0f
 #define CARD_H 54.0f
 
-enum { SCR_TITLE, SCR_SETUP, SCR_RULES, SCR_CREDITS, SCR_GAME };
+enum { SCR_LANG, SCR_TITLE, SCR_SETUP, SCR_RULES, SCR_CREDITS, SCR_GAME };
 enum {
     PH_START_ROLL, PH_START_SHOW, PH_WAIT_ROLL, PH_ROLLING,
     PH_CHOOSE, PH_PLACING, PH_GAMEOVER
@@ -80,6 +81,7 @@ static struct {
     unsigned int frame;
 
     int menu_sel;
+    int lang_sel;
 
     int setup_players;
     int setup_cpu[MAX_PLAYERS];
@@ -292,13 +294,53 @@ static void draw_scene(float water_y)
     draw_water(0, water_y + 6, SCREEN_W, SCREEN_H - water_y - 6, 255);
 }
 
+/* Botao da arte; em outros idiomas usa o botao sem texto + rotulo. */
 static void draw_button(int spr, float cx, float cy, int selected)
 {
     float s = selected ? 1.08f + 0.04f * pulse(0.15f) : 0.95f;
     rgba_t c = selected ? C_WHITE : RGBA(190, 200, 215, 255);
+    int blank = -1, label = -1;
+    switch (spr) {
+    case SPR_BTN_JOGAR: blank = SPR_BTN_BLANK_YELLOW; label = T_BTN_PLAY; break;
+    case SPR_BTN_CONTINUAR: blank = SPR_BTN_BLANK_YELLOW; label = T_BTN_CONTINUE; break;
+    case SPR_BTN_COMOJOGAR: blank = SPR_BTN_BLANK_BLUE; label = T_BTN_HOWTO; break;
+    case SPR_BTN_CREDITOS: blank = SPR_BTN_BLANK_BLUE; label = T_BTN_CREDITS; break;
+    case SPR_BTN_SAIR: blank = SPR_BTN_BLANK_RED; label = T_BTN_QUIT; break;
+    }
     if (selected)
         r_shape_c(SHAPE_GLOW, cx, cy, r_spr_w(spr) * 1.3f, RGBA(255, 255, 200, 140));
-    r_spr_c(spr, cx, cy, s, c);
+    if (label < 0 || !strcmp(TXT[label][g_lang], TXT[label][LANG_PT])) {
+        r_spr_c(spr, cx, cy, s, c);
+    } else {
+        const char *t = TXT[label][g_lang];
+        float w = r_spr_w(SPR_BTN_JOGAR) * s;     /* largura padrao */
+        float ts = 0.82f * s;
+        if (r_text_w(t, ts) > w - 40) w = r_text_w(t, ts) + 48;
+        r_spr(blank, cx - w / 2, cy - r_spr_h(blank) * s / 2, w, r_spr_h(blank) * s, c);
+        r_text_c_outline(cx, cy - 13 * s, ts, selected ? C_WHITE : RGB(0xDDE3EA),
+                         RGB(0x1A2238), t);
+    }
+}
+
+/* Emblema de vitoria/derrota: arte original em portugues, ou a arte sem
+ * o letreiro + texto traduzido. */
+static void draw_emblem(int defeat, float cy)
+{
+    int label = defeat ? T_DEFEAT : T_VICTORY;
+    if (!strcmp(TXT[label][g_lang], TXT[label][LANG_PT])) {
+        r_spr_c(defeat ? SPR_DEFEAT : SPR_VICTORY, 320, cy, 1.15f, C_WHITE);
+        return;
+    }
+    if (defeat) {
+        r_spr_b(SPR_DEFEAT_BASE, 320, cy + 92, 1.15f, C_WHITE);
+        r_ytext_c(320, cy - 88, 46, RGB(0x9FD8FF), TXT[label][g_lang]);
+    } else {
+        float w = r_ytext_w(TXT[label][g_lang], 44) + 60;
+        r_spr_b(SPR_VICTORY_BASE, 320, cy + 92, 1.15f, C_WHITE);
+        r_panel(320 - w / 2 - 3, cy - 93, w + 6, 58, RGB(0x5A0E0E));
+        r_panel(320 - w / 2, cy - 90, w, 52, RGB(0xD32F2F));
+        r_ytext_c(320, cy - 86, 44, C_WHITE, TXT[label][g_lang]);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -513,14 +555,14 @@ static void draw_bottom_bar(void)
     } else if (S.phase == PH_WAIT_ROLL) {
         if (S.g.is_cpu[S.g.current]) {
             char b[64];
-            snprintf(b, sizeof(b), "%s (CPU) vai rolar...", PNAME[S.g.current]);
+            snprintf(b, sizeof(b), T(T_CPU_ROLLS), PNAME[S.g.current]);
             r_text_shadow(CARD_X + 6, BAR_Y + 16, 0.8f, C_WHITE, b);
         } else {
             r_spr_c(SPR_ICON_X, CARD_X + 22, BAR_Y + 30, 1.0f + 0.15f * pulse(0.2f), C_WHITE);
-            r_text_shadow(CARD_X + 44, BAR_Y + 16, 0.8f, C_WHITE, "Rolar os dados!");
+            r_text_shadow(CARD_X + 44, BAR_Y + 16, 0.8f, C_WHITE, T(T_ROLL_DICE));
         }
     } else if (S.phase == PH_ROLLING) {
-        r_text_shadow(CARD_X + 6, BAR_Y + 16, 0.8f, C_DIM, "Rolando...");
+        r_text_shadow(CARD_X + 6, BAR_Y + 16, 0.8f, C_DIM, T(T_ROLLING));
     } else if (S.phase == PH_START_ROLL || S.phase == PH_START_SHOW) {
         int p;
         for (p = 0; p < S.g.num_players; p++) {
@@ -543,16 +585,16 @@ static void draw_header(void)
     float x;
     r_ytext(18, 8, 26, C_WHITE, "JOGO DAS BOIAS");
     if (S.phase == PH_START_ROLL || S.phase == PH_START_SHOW) {
-        r_text_outline(400, 12, 0.75f, C_WHITE, RGBA(0, 40, 80, 220), "Quem começa?");
+        r_text_outline(400, 12, 0.75f, C_WHITE, RGBA(0, 40, 80, 220), T(T_WHO_STARTS));
         return;
     }
-    snprintf(b, sizeof(b), "Vez do %s", PNAME[S.g.current]);
+    snprintf(b, sizeof(b), T(T_TURN_OF), PNAME[S.g.current]);
     x = 620 - r_text_w(b, 0.75f);
     r_spr_c(P_BADGE[S.g.current], x - 20, 26, 0.55f, C_WHITE);
     r_text_outline(x, 12, 0.75f, C_WHITE, RGBA(0, 40, 80, 220), b);
     if (S.g.bonus_roll && S.phase != PH_GAMEOVER) {
         r_spr_c(SPR_STAR, x - 58, 26, 0.75f + 0.1f * pulse(0.25f), C_WHITE);
-        r_text_outline(x - 76 - r_text_w("BÔNUS", 0.6f), 16, 0.6f, C_GOLD, RGBA(0, 40, 80, 220), "BÔNUS");
+        r_text_outline(x - 76 - r_text_w(T(T_BONUS), 0.6f), 16, 0.6f, C_GOLD, RGBA(0, 40, 80, 220), T(T_BONUS));
     }
 }
 
@@ -582,7 +624,7 @@ static void begin_turn(void)
     audio_sfx(SFX_POP);
     if (!S.g.bonus_roll) {
         char b[64];
-        snprintf(b, sizeof(b), "Vez do %s.", PNAME[S.g.current]);
+        snprintf(b, sizeof(b), T(T_TURN_OF_DOT), PNAME[S.g.current]);
         set_msg(C_DIM, b);
     }
 }
@@ -604,7 +646,7 @@ static void start_game(void)
     }
     S.phase = PH_START_ROLL;
     S.timer = 0;
-    set_msg(C_DIM, "Cada jogador rola um dado: o maior começa.");
+    set_msg(C_DIM, T(T_EACH_ROLLS));
 }
 
 static void finish_move(void)
@@ -613,7 +655,7 @@ static void finish_move(void)
     if (S.g.winner >= 0) {
         S.phase = PH_GAMEOVER;
         S.timer = 0;
-        snprintf(b, sizeof(b), "%s esvaziou a reserva e venceu!", PNAME[S.g.winner]);
+        snprintf(b, sizeof(b), T(T_WON_MSG), PNAME[S.g.winner]);
         set_msg(C_GOLD, b);
         return;
     }
@@ -621,7 +663,7 @@ static void finish_move(void)
         S.banner_timer = 90;
         audio_sfx(SFX_SPARKLE);
         react(S.g.current, REACT_HAPPY);
-        snprintf(b, sizeof(b), "Somou 7! %s ganha mais um lance.", PNAME[S.g.current]);
+        snprintf(b, sizeof(b), T(T_SEVEN), PNAME[S.g.current]);
         set_msg(C_GOLD, b);
         S.phase = PH_WAIT_ROLL;
         S.timer = 0;
@@ -665,7 +707,7 @@ static void apply_place(void)
     S.placed = 1;
 
     if (lane == SAFE_LANE) {
-        set_msg(C_GOLD, "Boia segura com o salva-vidas da raia 7!");
+        set_msg(C_GOLD, T(T_SAFE));
         audio_sfx(SFX_CHIME);
     } else if (r.penalty) {
         float px, py;
@@ -676,7 +718,7 @@ static void apply_place(void)
         for (s = 0; s < n0 - 1; s++)
             add_fly(lane_cx(lane), slot_cy(s + 1), px, py, before[s], 30, 10 + s * 5, CHIP_S);
         S.lane_flash[lane] = 48;
-        snprintf(S.msg, sizeof(S.msg), "PENALIDADE! %s expulsou a própria boia e recolhe %d da raia %d.",
+        snprintf(S.msg, sizeof(S.msg), T(T_PENALTY),
                  PNAME[me], r.penalty_n, lane);
         S.msg_col = C_DANGER;
         react(me, REACT_SAD);
@@ -685,13 +727,13 @@ static void apply_place(void)
         float px, py;
         panel_center(r.kicked, &px, &py);
         add_fly(lane_cx(lane), slot_cy(LANE_CAP - 1) - 20, px, py, r.kicked, 30, 0, CHIP_S);
-        snprintf(S.msg, sizeof(S.msg), "Boia %s expulsa da raia %d! Volta para o %s.",
+        snprintf(S.msg, sizeof(S.msg), T(T_KICKED),
                  PCOR_F[r.kicked], lane, PNAME[r.kicked]);
         S.msg_col = RGB(0xFFEB3B);
         react(r.kicked, REACT_SAD);
         audio_sfx(SFX_BOING);
     } else {
-        snprintf(S.msg, sizeof(S.msg), "Boia colocada na raia %d.", lane);
+        snprintf(S.msg, sizeof(S.msg), T(T_PLACED), lane);
         audio_sfx(SFX_SPLASH);
         S.msg_col = C_WHITE;
     }
@@ -750,14 +792,14 @@ static void update_game(unsigned int pressed)
                 for (p = 0; p < S.g.num_players; p++)
                     if (S.start_active[p] && S.start_dice[p] == best) S.g.current = p;
                 S.start_tie = 0;
-                snprintf(b, sizeof(b), "%s tirou o maior número e começa!", PNAME[S.g.current]);
+                snprintf(b, sizeof(b), T(T_HIGHEST), PNAME[S.g.current]);
                 set_msg(C_GOLD, b);
                 react(S.g.current, REACT_HAPPY);
             } else {
                 for (p = 0; p < S.g.num_players; p++)
                     if (S.start_active[p] && S.start_dice[p] != best) S.start_active[p] = 0;
                 S.start_tie = 1;
-                set_msg(C_DIM, "Empate! Os empatados rolam de novo...");
+                set_msg(C_DIM, T(T_TIE));
             }
             S.phase = PH_START_SHOW;
             S.timer = 0;
@@ -791,7 +833,7 @@ static void update_game(unsigned int pressed)
             S.cpu_target = S.g.is_cpu[S.g.current] ? ai_choose(&S.g, S.moves, S.n_moves) : 0;
             S.phase = PH_CHOOSE;
             S.timer = 0;
-            set_msg(C_DIM, "Escolha onde colocar as boias (estrela = soma 7, bônus).");
+            set_msg(C_DIM, T(T_CHOOSE));
         }
         break;
     case PH_CHOOSE:
@@ -835,48 +877,63 @@ static void update_game(unsigned int pressed)
 /* Telas                                                               */
 /* ------------------------------------------------------------------ */
 
-static const char *RULE_TITLES[] = {
-    "OBJETIVO", "OS DADOS", "COLOCANDO BOIAS", "PENALIDADE", "BONUS DO 7", "CONTROLES"
-};
-static const char *RULE_TEXT[] = {
-    "Cada jogador começa com 12 boias da sua cor na reserva.\n"
-    "Seja o primeiro a esvaziar a reserva colocando as boias nas raias da piscina.\n"
-    "As raias vão de 1 a 12. Na raia 7 fica o salva-vidas.\n"
-    "Para começar, cada um rola um dado: quem tirar mais joga primeiro.",
 
-    "Na sua vez, role os 3 dados. Cada dado coloca 1 boia na raia do seu número, "
-    "ou você pode somar 2 ou 3 dados para alcançar raias maiores (colocando menos boias).\n"
-    "Ex.: 6, 4 e 2 permitem: raias 2, 4 e 6 / raias 10 e 2 / raias 8 e 4 / "
-    "duas boias na 6 / uma boia na 12.",
+/* Bandeiras desenhadas com retangulos e triangulos. */
+static void draw_flag(int lang, float x, float y, float w, float h)
+{
+    int i;
+    r_rect(x - 2, y - 2, w + 4, h + 4, RGB(0x1A2238));
+    if (lang == LANG_PT) {
+        r_rect(x, y, w, h, RGB(0x009C3B));
+        r_tri(x + w / 2, y + 4, x + w - 5, y + h / 2, x + 5, y + h / 2, RGB(0xFFDF00));
+        r_tri(x + 5, y + h / 2, x + w - 5, y + h / 2, x + w / 2, y + h - 4, RGB(0xFFDF00));
+        r_shape_c(SHAPE_DISC, x + w / 2, y + h / 2, h * 0.52f, RGB(0x002776));
+        r_rect(x + w / 2 - h * 0.24f, y + h / 2 - 1, h * 0.48f, 2, RGB(0xFFFFFF));
+    } else if (lang == LANG_EN) {
+        for (i = 0; i < 13; i++)
+            r_rect(x, y + h * i / 13.0f, w, h / 13.0f + 0.5f, i % 2 ? RGB(0xFFFFFF) : RGB(0xB22234));
+        r_rect(x, y, w * 0.42f, h * 7 / 13.0f, RGB(0x3C3B6E));
+        for (i = 0; i < 12; i++)
+            r_rect(x + 3 + (i % 4) * w * 0.095f, y + 3 + (i / 4) * h * 0.15f, 2, 2, RGB(0xFFFFFF));
+    } else {
+        r_rect(x, y, w, h, RGB(0xAA151B));
+        r_rect(x, y + h / 4, w, h / 2, RGB(0xF1BF00));
+    }
+}
 
-    "A boia entra sempre na casa de baixo e empurra as outras para cima.\n"
-    "Cada raia tem no máximo 3 boias. Se a raia estiver cheia, a boia de cima é "
-    "expulsa e volta para a reserva do dono (da mesma cor).",
-
-    "Se você expulsar uma boia da SUA cor, recebe uma penalidade: recolhe TODAS as "
-    "boias daquela raia, de qualquer cor.\n"
-    "Boias de outras cores na sua reserva devem ser colocadas primeiro. Elas continuam "
-    "sendo dos adversários se forem expulsas depois.",
-
-    "Somou 7 com 2 ou 3 dados? A boia vai para a raia 7, com o salva-vidas (sem limite, "
-    "e de lá nunca volta) e você joga de novo!\n"
-    "No lance bônus o 7 ainda vale, mas não há um terceiro lance.\n"
-    "Usar o 7 é opcional. Vence quem ficar sem boias primeiro!",
-
-    "Direcional: escolher opção\n"
-    "X: confirmar / rolar os dados\n"
-    "O: voltar\n"
-    "START: pausar o jogo\n"
-    "SELECT: liga/desliga a música\n"
-    "Jogue com amigos passando o controle, ou contra a CPU."
-};
-#define N_RULES 6
+static void draw_lang(void)
+{
+    static const int icons[] = { SPR_ARROW_U, SPR_ARROW_D, SPR_ICON_X };
+    const char *texts[3];
+    float t = S.frame * 0.05f;
+    int i;
+    draw_scene(372);
+    r_spr_c(SPR_LOGO, 320, 82 + sinf(t * 0.8f) * 3.0f, 0.85f, C_WHITE);
+    r_text_c_outline(320, 156, 0.62f, C_WHITE, RGBA(0, 40, 80, 220),
+                     "Escolha o idioma  |  Choose your language  |  Elige tu idioma");
+    for (i = 0; i < LANG_COUNT; i++) {
+        int sel = i == S.lang_sel;
+        float y = 196 + i * 56.0f, bob = sel ? sinf(S.frame * 0.15f) * 2 : 0;
+        if (sel)
+            r_panel(176, y - 4 + bob, 288, 52, WITH_ALPHA(RGB(0xFF8F00), (int)(170 + 80 * pulse(0.2f))));
+        r_panel(180, y + bob, 280, 44, sel ? RGBA(255, 246, 224, 250) : RGBA(255, 246, 224, 190));
+        draw_flag(i, 196, y + 7 + bob, 44, 30);
+        r_text(260, y + 7 + bob, 0.9f, sel ? C_INK : RGBA(13, 59, 102, 170), LANG_NAME[i]);
+        if (i == LANG_PT)
+            r_spr_c(SPR_STAR, 438, y + 22 + bob, 0.55f, C_WHITE);
+    }
+    texts[0] = "";
+    texts[1] = TXT[T_SELECT][S.lang_sel];
+    texts[2] = TXT[T_CONFIRM][S.lang_sel];
+    draw_hints(414, 3, icons, texts);
+}
 
 static void draw_title(void)
 {
     static const int items[] = { SPR_BTN_JOGAR, SPR_BTN_COMOJOGAR, SPR_BTN_CREDITOS };
     static const int icons[] = { SPR_ICON_X };
-    static const char *texts[] = { "Confirmar" };
+    static const int icons2[] = { SPR_ICON_X, SPR_ICON_TRI };
+    const char *texts[2];
     float t = S.frame * 0.05f;
     int i;
     draw_scene(300);
@@ -892,27 +949,35 @@ static void draw_title(void)
 
     for (i = 0; i < 3; i++)
         draw_button(items[i], 320, 190 + i * 44.0f, i == S.menu_sel);
-    draw_hints(422, 1, icons, texts);
+    texts[0] = T(T_CONFIRM);
+    texts[1] = T(T_LANGUAGE);
+    (void)icons;
+    draw_hints(422, 2, icons2, texts);
 }
 
 static void draw_setup(void)
 {
     static const int icons[] = { SPR_ICON_X, SPR_ICON_O, SPR_ICON_TRI };
-    static const char *texts[] = { "Escolher", "Voltar", "Jogar" };
+    const char *texts[3];
     char b[48];
     int i;
+    texts[0] = T(T_SELECT);
+    texts[1] = T(T_BACK);
+    texts[2] = T(T_PLAY);
     draw_scene(330);
-    r_ytext_c(320, 12, 40, C_WHITE, "JOGADORES");
+    r_ytext_c(320, 12, 40, C_WHITE, T(T_PLAYERS_TITLE));
 
     /* numero de jogadores */
     {
         int sel = S.setup_row == 0;
         float pz = sel ? 0.1f * pulse(0.2f) : 0;
-        r_panel(200, 60, 240, 40, sel ? RGBA(255, 236, 160, 240) : RGBA(255, 246, 224, 200));
-        r_spr_c(SPR_ARROW_L, 222, 80, 0.9f + pz, sel ? C_WHITE : RGBA(255, 255, 255, 120));
-        r_spr_c(SPR_ARROW_R, 418, 80, 0.9f + pz, sel ? C_WHITE : RGBA(255, 255, 255, 120));
-        snprintf(b, sizeof(b), "%d JOGADORES", S.setup_players);
-        r_ytext_c(320, 66, 28, C_WHITE, b);
+        float th = 28;
+        r_panel(170, 60, 300, 40, sel ? RGBA(255, 236, 160, 240) : RGBA(255, 246, 224, 200));
+        r_spr_c(SPR_ARROW_L, 192, 80, 0.9f + pz, sel ? C_WHITE : RGBA(255, 255, 255, 120));
+        r_spr_c(SPR_ARROW_R, 448, 80, 0.9f + pz, sel ? C_WHITE : RGBA(255, 255, 255, 120));
+        snprintf(b, sizeof(b), T(T_N_PLAYERS), S.setup_players);
+        if (r_ytext_w(b, th) > 210) th = th * 210 / r_ytext_w(b, th);
+        r_ytext_c(320, 80 - th / 2, th, C_WHITE, b);
     }
 
     for (i = 0; i < MAX_PLAYERS; i++) {
@@ -926,11 +991,11 @@ static void draw_setup(void)
         r_spr_b(P_CHAR[i], x + 69, y + 120 + bob, 0.86f, tint);
         r_text_c(x + 69, y + 124, 0.75f, on ? C_INK : RGBA(13, 59, 102, 110), PNAME[i]);
         if (on) {
-            const char *mode = S.setup_cpu[i] ? "CPU" : "HUMANO";
+            const char *mode = S.setup_cpu[i] ? "CPU" : T(T_HUMAN);
             r_panel(x + 12, y + 156, 114, 32, S.setup_cpu[i] ? RGB(0x5C6BC0) : RGB(0x43A047));
             r_text_c(x + 69, y + 158, 0.72f, C_WHITE, mode);
         } else {
-            r_text_c(x + 69, y + 160, 0.65f, RGBA(13, 59, 102, 120), "fora");
+            r_text_c(x + 69, y + 160, 0.65f, RGBA(13, 59, 102, 120), T(T_OUT));
         }
     }
 
@@ -941,14 +1006,17 @@ static void draw_setup(void)
 static void draw_rules(void)
 {
     static const int icons[] = { SPR_ARROW_L, SPR_ARROW_R, SPR_ICON_O };
-    static const char *texts[] = { "", "Página", "Voltar" };
+    const char *texts[3];
     char b[32];
     int i;
+    texts[0] = "";
+    texts[1] = T(T_PAGE);
+    texts[2] = T(T_BACK);
     draw_scene(360);
-    r_ytext_c(320, 10, 40, C_WHITE, "COMO JOGAR");
+    r_ytext_c(320, 10, 40, C_WHITE, T(T_HOWTO_TITLE));
     r_panel(30, 62, 580, 300, RGBA(255, 246, 224, 245));
-    r_ytext(52, 74, 28, C_WHITE, RULE_TITLES[S.rules_page]);
-    wrap_text(52, 116, 440, 0.66f, C_INK, RULE_TEXT[S.rules_page], 22);
+    r_ytext(52, 74, 28, C_WHITE, RULE_TITLE[g_lang][S.rules_page]);
+    wrap_text(52, 116, 440, 0.64f, C_INK, RULE_BODY[g_lang][S.rules_page], 21);
     r_spr_b(P_REACT[S.rules_page % 4][S.rules_page == 3 ? REACT_SAD : REACT_HAPPY],
             552, 350 + sinf(S.frame * 0.1f) * 3, 1.15f, C_WHITE);
 
@@ -963,17 +1031,19 @@ static void draw_rules(void)
 static void draw_credits(void)
 {
     static const int icons[] = { SPR_ICON_O };
-    static const char *texts[] = { "Voltar" };
-    draw_scene(330);
-    r_ytext_c(320, 12, 40, C_WHITE, "CREDITOS");
-    r_panel(90, 66, 460, 250, RGBA(255, 246, 224, 240));
-    r_spr_c(SPR_LOGO, 320, 128, 0.6f, C_WHITE);
-    r_text_c(320, 196, 0.7f, C_INK, "Arte e ideia: equipe Jogo das Boias");
-    r_text_c(320, 224, 0.7f, C_INK, "Programação: C, PS2SDK e gsKit");
-    r_text_c(320, 252, 0.7f, C_INK, "Texto: fonte DejaVu Sans");
-    r_text_c(320, 280, 0.6f, RGB(0x37474F), "Homebrew para PlayStation 2");
-    r_spr_c(SPR_TROPHY, 130, 290, 1.0f, C_WHITE);
-    r_spr_c(SPR_STAR, 512, 290, 1.0f, C_WHITE);
+    const char *texts[1];
+    texts[0] = T(T_BACK);
+    draw_scene(340);
+    r_ytext_c(320, 12, 40, C_WHITE, T(T_CREDITS_TITLE));
+    r_panel(80, 62, 480, 268, RGBA(255, 246, 224, 240));
+    r_spr_c(SPR_LOGO, 320, 116, 0.55f, C_WHITE);
+    r_text_c(320, 178, 0.66f, C_INK, T(T_CRED1));
+    r_text_c(320, 204, 0.66f, C_INK, T(T_CRED2));
+    r_text_c(320, 230, 0.66f, C_INK, T(T_CRED3));
+    r_text_c(320, 256, 0.66f, C_INK, T(T_CRED4));
+    r_text_c(320, 286, 0.58f, RGB(0x37474F), T(T_CRED5));
+    r_spr_c(SPR_TROPHY, 122, 290, 1.0f, C_WHITE);
+    r_spr_c(SPR_STAR, 518, 290, 1.0f, C_WHITE);
     draw_hints(414, 1, icons, texts);
 }
 
@@ -993,8 +1063,8 @@ static void draw_game(void)
         float a = S.banner_timer > 20 ? 1.0f : S.banner_timer / 20.0f;
         float s = S.banner_timer > 80 ? 1.0f + (S.banner_timer - 80) * 0.08f : 1.0f;
         r_spr_c(SPR_BURST, 320, 190, 2.1f * s, RGBA(255, 255, 255, (int)(255 * a)));
-        r_text_c(320, 160, 1.3f, RGBA(13, 59, 102, (int)(255 * a)), "BÔNUS!");
-        r_text_c(320, 200, 0.75f, RGBA(13, 59, 102, (int)(255 * a)), "Jogue de novo!");
+        r_text_c(320, 160, 1.3f, RGBA(13, 59, 102, (int)(255 * a)), T(T_BONUS_BIG));
+        r_text_c(320, 200, 0.75f, RGBA(13, 59, 102, (int)(255 * a)), T(T_PLAY_AGAIN));
     }
 
     if (S.phase == PH_GAMEOVER) {
@@ -1006,16 +1076,15 @@ static void draw_game(void)
         r_shape_c(SHAPE_GLOW, 320, 160, 560, RGBA(255, 240, 180, 110));
         r_panel(150, 236, 340, 132, RGBA(8, 40, 80, 225));
         /* derrota quando um humano perde para a CPU */
-        r_spr_c(humans > 0 && S.g.is_cpu[w] ? SPR_DEFEAT : SPR_VICTORY, 320,
-                138 + sinf(t) * 4, 1.15f, C_WHITE);
+        draw_emblem(humans > 0 && S.g.is_cpu[w], 138 + sinf(t) * 4);
         r_spr_b(P_CHAR[w], 118, 352 + sinf(t * 1.3f) * 4, 1.05f, C_WHITE);
         r_spr_c(SPR_TROPHY, 528, 300, 1.4f, C_WHITE);
-        snprintf(b, sizeof(b), "%s venceu!", PNAME[w]);
+        snprintf(b, sizeof(b), T(T_WINS), PNAME[w]);
         r_text_c_outline(320, 246, 1.25f, C_GOLD, RGBA(0, 30, 60, 255), b);
         r_text_c_outline(320, 290, 0.65f, C_WHITE, RGBA(0, 30, 60, 255),
-                         "Foi o primeiro a esvaziar a reserva!");
+                         T(T_FIRST_EMPTY));
         r_spr_c(SPR_ICON_X, 262, 346, 0.9f, C_WHITE);
-        r_text_outline(282, 336, 0.65f, C_WHITE, RGBA(0, 30, 60, 220), "Voltar ao menu");
+        r_text_outline(282, 336, 0.65f, C_WHITE, RGBA(0, 30, 60, 220), T(T_BACK_MENU));
     }
 
     if (S.paused) {
@@ -1023,7 +1092,7 @@ static void draw_game(void)
         int i;
         r_rect(0, 0, SCREEN_W, SCREEN_H, RGBA(0, 0, 0, 150));
         r_panel(180, 110, 280, 230, RGBA(255, 246, 224, 240));
-        r_ytext_c(320, 122, 36, C_WHITE, "PAUSA");
+        r_ytext_c(320, 122, 36, C_WHITE, T(T_PAUSE));
         for (i = 0; i < 3; i++)
             draw_button(items[i], 320, 196 + i * 48.0f, i == S.pause_sel);
     }
@@ -1036,7 +1105,8 @@ static void draw_game(void)
 void ui_init(void)
 {
     memset(&S, 0, sizeof(S));
-    S.screen = SCR_TITLE;
+    S.screen = SCR_LANG;
+    S.lang_sel = LANG_PT;
     S.setup_players = 2;
     S.setup_cpu[1] = 1;
     S.setup_cpu[2] = 1;
@@ -1074,6 +1144,7 @@ void ui_update(unsigned int pressed)
     int prev_screen = S.screen, prev_paused = S.paused;
     int prev_menu = S.menu_sel, prev_row = S.setup_row, prev_card = S.setup_card;
     int prev_players = S.setup_players, prev_page = S.rules_page, prev_psel = S.pause_sel;
+    int prev_lang = S.lang_sel;
     int prev_cpu = S.setup_cpu[0] | S.setup_cpu[1] << 1 | S.setup_cpu[2] << 2 | S.setup_cpu[3] << 3;
     int cpu;
 
@@ -1092,7 +1163,7 @@ void ui_update(unsigned int pressed)
         else audio_sfx(SFX_CONFIRM);
     } else if (S.menu_sel != prev_menu || S.setup_row != prev_row || S.setup_card != prev_card ||
                S.setup_players != prev_players || S.rules_page != prev_page ||
-               S.pause_sel != prev_psel) {
+               S.pause_sel != prev_psel || S.lang_sel != prev_lang) {
         audio_sfx(SFX_MOVE);
     } else if (cpu != prev_cpu) {
         audio_sfx(SFX_POP);
@@ -1111,7 +1182,20 @@ static void ui_update_screens(unsigned int pressed)
     if (!ui_rand_state) ui_rand_state = 1;
 
     switch (S.screen) {
+    case SCR_LANG:
+        if (pressed & BTN_UP) S.lang_sel = (S.lang_sel + LANG_COUNT - 1) % LANG_COUNT;
+        if (pressed & BTN_DOWN) S.lang_sel = (S.lang_sel + 1) % LANG_COUNT;
+        if (pressed & (BTN_CROSS | BTN_START)) {
+            g_lang = S.lang_sel;
+            S.screen = SCR_TITLE;
+        }
+        break;
     case SCR_TITLE:
+        if (pressed & BTN_TRIANGLE) {
+            S.lang_sel = g_lang;
+            S.screen = SCR_LANG;
+            break;
+        }
         if (pressed & BTN_UP) S.menu_sel = (S.menu_sel + 2) % 3;
         if (pressed & BTN_DOWN) S.menu_sel = (S.menu_sel + 1) % 3;
         if (pressed & (BTN_CROSS | BTN_START)) {
@@ -1151,6 +1235,7 @@ static void ui_update_screens(unsigned int pressed)
 void ui_draw(void)
 {
     switch (S.screen) {
+    case SCR_LANG: draw_lang(); break;
     case SCR_TITLE: draw_title(); break;
     case SCR_SETUP: draw_setup(); break;
     case SCR_RULES: draw_rules(); break;
@@ -1158,7 +1243,7 @@ void ui_draw(void)
     case SCR_GAME: draw_game(); break;
     }
     if (S.toast_timer > 0) {
-        const char *t = audio_music_on() ? "Música: ligada" : "Música: desligada";
+        const char *t = audio_music_on() ? T(T_MUSIC_ON) : T(T_MUSIC_OFF);
         int a = S.toast_timer > 20 ? 230 : S.toast_timer * 230 / 20;
         float w = r_text_w(t, 0.7f) + 40;
         r_panel(320 - w / 2, 54, w, 34, RGBA(8, 52, 96, a));
