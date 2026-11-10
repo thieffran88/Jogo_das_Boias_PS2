@@ -1,0 +1,31 @@
+name: Build PS2
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/ps2dev/ps2dev:latest
+    steps:
+      - name: Dependencias
+        run: apk add --no-cache build-base make xorriso git
+
+      - uses: actions/checkout@v4
+
+      - name: Testes das regras
+        run: make test
+
+      - name: Compilar ELF e ISO
+        run: |
+          make
+          make iso
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jogo-das-boias-ps2
+          path: |
+            jogo_das_boias.elf
+            jogo_das_boias.iso

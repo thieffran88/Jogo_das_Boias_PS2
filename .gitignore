@@ -1,0 +1,6 @@
+*.o
+build/
+build_stripped.elf
+jogo_das_boias_unpacked.elf
+/jogo_das_boias.elf
+/jogo_das_boias.iso
