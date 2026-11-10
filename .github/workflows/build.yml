@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Versao do release (ex.: v1.0.0). Vazio = so compila."
+        required: false
+        default: ""
 
 jobs:
   build:
@@ -32,9 +37,10 @@ jobs:
             jogo_das_boias.elf
             jogo_das_boias.iso
 
-  # Ao enviar uma tag vX.Y.Z, publica o ELF e a ISO em um release.
+  # Ao enviar uma tag vX.Y.Z (ou rodar manualmente com "version"),
+  # publica o ELF e a ISO em um release.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -46,7 +52,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: Jogo das Boias PS2 ${{ github.ref_name }}
+          tag_name: ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Jogo das Boias PS2 ${{ inputs.version || github.ref_name }}
           body: |
             Jogo das Boias PS2 - homebrew para PlayStation 2.
 
